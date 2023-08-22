@@ -1,22 +1,37 @@
-package db
+package repository
 
 import (
+	"fmt"
 	"github.com/v1lezz/todo"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-type DataBase struct {
-	Client *gorm.DB
+type DBConfig struct {
+	Username string
+	Password string
+	Host     string
+	Port     string
+	DBName   string
+	SSLMode  string
 }
 
-func (db *DataBase) ConnectDB() (err error) {
-	dsn := "host=localhost user=postgres password=postgres dbname=todo port=5432 sslmode=disable"
-	db.Client, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+func InitPostgresDB(cfg DBConfig) (*gorm.DB, error) {
+	db, err := gorm.Open(
+		postgres.Open(fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
+			cfg.Host,
+			cfg.Username,
+			cfg.Password,
+			cfg.DBName,
+			cfg.Port,
+			cfg.SSLMode,
+		)),
+		&gorm.Config{},
+	)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return db.Client.AutoMigrate(
+	err = db.AutoMigrate(
 		&todo.UserEntity{},
 		&todo.TaskEntity{},
 		&todo.CommentEntity{},
@@ -24,14 +39,8 @@ func (db *DataBase) ConnectDB() (err error) {
 		&todo.TaskEntity{},
 		&todo.CategoryEntity{},
 	)
-
-}
-
-func InitDB() (*DataBase, error) {
-	db := &DataBase{}
-	if err := db.ConnectDB(); err != nil {
+	if err != nil {
 		return nil, err
 	}
-
-	return db, nil
+	return db, err
 }

@@ -1,40 +1,53 @@
 package main
 
 import (
-	"github.com/v1lezz/todo/pkg/config/db"
-	comments "github.com/v1lezz/todo/pkg/entities/CommentEntity/models"
-	files "github.com/v1lezz/todo/pkg/entities/FileEntity/models"
-	"log"
-	"time"
+	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"github.com/v1lezz/todo"
+	"github.com/v1lezz/todo/pkg/handler"
+	"github.com/v1lezz/todo/pkg/handler/email"
+	"github.com/v1lezz/todo/pkg/repository"
+	"github.com/v1lezz/todo/pkg/service"
+	"os"
 )
 
 func main() {
-	db, err := db.InitDB()
-	if err != nil {
-		log.Fatal(err)
+	logrus.SetFormatter(new(logrus.JSONFormatter))
+	if err := initCFG(); err != nil {
+		logrus.Fatalf("error init cfg: %s", err.Error())
 	}
-	db.Client.Create(&comments.CommentEntity{
-		Deadline: time.Now(),
-		Payload:  "",
-		Files: []files.FileEntity{
-			files.FileEntity{LinkToGet: "google.com"},
-		},
-	})
+	if err := godotenv.Load(); err != nil {
+		logrus.Fatalf("error init enviroment: %s", err.Error())
+	}
 
-	//db.Client.Create(&comments.CommentEntity{
-	//	gorm.Model{
-	//		ID: 0,
-	//		CreatedAt: time.Now(),
-	//		UpdatedAt: time.Now(),
-	//		DeletedAt: gorm.DeletedAt{
-	//			Time: nil,
-	//			Valid: false,
-	//		},
-	//	},
-	//})
-	//router := gin.Default()
-	//err := router.Run("localhost:8080")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	db, err := repository.InitPostgresDB(repository.DBConfig{
+		viper.GetString("db.username"),
+		os.Getenv("DB_PASSWORD"),
+		viper.GetString("db.host"),
+		viper.GetString("db.port"),
+		viper.GetString("db.dbname"),
+		viper.GetString("db.sslmode"),
+	})
+	if err != nil {
+		logrus.Fatalf("error start db: %s", err.Error())
+	}
+	repos := repository.NewRepository(db)
+	services := service.NewService(repos)
+	handler := handler.NewHandler(services, email.NewEmailSmtp(email.NewConfig(
+		viper.GetString("email.mail"),
+		os.Getenv("EMAIL_PASSWORD"),
+		viper.GetString("email.host"),
+		viper.GetString("email.port"),
+	)))
+	server := new(todo.Server)
+	if err = server.Run(viper.GetString("port"), handler.InitRoutes()); err != nil {
+		logrus.Fatalf("error start server: %s", err.Error())
+	}
+}
+
+func initCFG() error {
+	viper.AddConfigPath("configs")
+	viper.SetConfigName("config")
+	return viper.ReadInConfig()
 }

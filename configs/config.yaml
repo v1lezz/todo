@@ -1,0 +1,14 @@
+port: "8080"
+
+db:
+  username: "postgres"
+  password: "postgres"
+  host: "localhost"
+  port: "5432"
+  dbname: "todo"
+  sslmode: "disable"
+
+email:
+  mail: "v1lezztest@gmail.com"
+  host: "smtp.gmail.com"
+  port: "587"
